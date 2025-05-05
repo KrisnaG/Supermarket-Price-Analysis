@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 import httpx
-import json
-import re
 
 
 class ProductBaseService(ABC):
@@ -12,6 +10,15 @@ class ProductBaseService(ABC):
     @abstractmethod
     def _product_url(self) -> str:
         """Base URL for product endpoints"""
+        pass
+
+    @abstractmethod
+    def extract_search_results(self, search_result: str) -> Optional[Dict[str, Any]]:
+        """
+        Extract search results from the response.
+        :param search_result: The search result string
+        :returns: Dictionary containing product details or None if not found
+        """
         pass
 
     def search_product(self, product_id: str) -> Optional[Dict[str, Any]]:
@@ -33,19 +40,8 @@ class ProductBaseService(ABC):
             result = httpx.get(url, headers=headers, timeout=30.0)
             result.raise_for_status()
             decoded_str = result.content.decode('utf-8', errors='ignore')
+            return self.extract_search_results(decoded_str)
 
-            # TODO: This will not apply to coles
-            match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
-                              decoded_str, re.DOTALL)
-
-            if match:
-                json_text = match.group(1)
-                data = json.loads(json_text)
-                return data["props"]["pageProps"]["pdDetails"]
-            else:
-                print(f"Could not extract JSON from response for product {product_id}")
-                return None
-
-        except (httpx.RequestError, json.JSONDecodeError, KeyError) as e:
+        except httpx.RequestError as e:
             print(f"Error fetching product {product_id}: {str(e)}")
             return None

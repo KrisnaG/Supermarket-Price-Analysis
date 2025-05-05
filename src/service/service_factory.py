@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Type
+from typing import Type, Dict
 
 from src.service.product_base_service import ProductBaseService
 from src.service.woolworths_service import WoolworthsService
@@ -7,12 +7,14 @@ from src.service.coles_service import ColesService
 
 
 class ServiceType(Enum):
+    """Enum representing different product service types."""
     WOOLWORTHS = "woolworths"
     COLES = "coles"
 
 
 class ServiceFactory:
-    _services: dict[ServiceType, Type[ProductBaseService]] = {
+    """Factory class for creating instances of product services."""
+    _services: Dict[ServiceType, Type[ProductBaseService]] = {
         ServiceType.WOOLWORTHS: WoolworthsService,
         ServiceType.COLES: ColesService,
     }
