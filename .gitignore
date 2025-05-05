@@ -1,0 +1,11 @@
+# Enviroment
+.venv
+.idea
+
+# Build
+dist
+build
+**/*.spec
+
+# Python
+__pycache__
