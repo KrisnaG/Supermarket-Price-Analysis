@@ -1,8 +1,8 @@
-from peewee import Model, FloatField, CharField, DateField, BooleanField
+from peewee import Model, FloatField, CharField, BooleanField
 
 
 class Product(Model):
-    date = DateField()
+    date = CharField()
     stockcode = CharField()
     product_name = CharField()
     price = FloatField()
@@ -10,10 +10,9 @@ class Product(Model):
     is_half_price = BooleanField()
     was_price = FloatField()
     savings_amount = FloatField()
+    package_size = CharField()
+    unit_weight_in_grams = FloatField()
     cup_price = FloatField()
     cup_measure = CharField()
     cup_string = CharField()
     store = CharField()
-
-    class Meta:
-        database = db
