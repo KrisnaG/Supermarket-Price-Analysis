@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
+from src.models.product import Product
 from src.service.product_base_service import ProductBaseService
 
 
@@ -31,27 +32,35 @@ class WoolworthsService(ProductBaseService):
 
         return None
 
-    def get_product_details(self, products: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def get_product_details(self, stockcodes: List[str]) -> List[Product]:
         """
         Process products and fetch their details.
-        :param products: List of products to process.
+        :param stockcodes: List of product stockcodes to process.
         :returns: List of dictionaries containing product details.
         """
-        today = datetime.now().strftime('%Y%m%d')
+        today = datetime.now().strftime('%Y-%m-%d')
         rows = []
 
-        for product in products:
-            stockcode = product["Stockcode"]
+        for stockcode in stockcodes:
             product_data = self.search_product(product_id=stockcode)
 
             if product_data:
-                row = {
-                    "Date": today,
-                    "Stockcode": stockcode,
-                    "Name": product_data["Product"]["Name"],
-                    "Price": product_data["Product"]["Price"],
-                    **product_data
-                }
+                row = Product(
+                    date=today,
+                    stockcode=stockcode,
+                    product_name=product_data["Product"]["Name"],
+                    price=product_data["Product"]["Price"],
+                    is_on_special=product_data["Product"]["IsOnSpecial"],
+                    is_half_price=product_data["Product"]["IsHalfPrice"],
+                    was_price=product_data["Product"]["WasPrice"],
+                    savings_amount=product_data["Product"]["SavingsAmount"],
+                    package_size=product_data["Product"]["PackageSize"].upper(),
+                    unit_weight_in_grams=product_data["Product"]["UnitWeightInGrams"],
+                    cup_price=product_data["Product"]["CupPrice"],
+                    cup_measure=product_data["Product"]["CupMeasure"],
+                    cup_string=product_data["Product"]["CupString"],
+                    store="woolworths",
+                )
                 rows.append(row)
 
         return rows
