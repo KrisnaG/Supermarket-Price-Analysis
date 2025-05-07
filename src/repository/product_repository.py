@@ -1,16 +1,18 @@
+import os
 from typing import List, Dict
 
 from peewee import SqliteDatabase
 from playhouse.shortcuts import model_to_dict
 from src.models.product import Product
+from src.tools.path_tools import get_app_root
 
 
 class ProductRepository:
     """Repository to manage the Product model with SQLite."""
 
     def __init__(self):
-        self.db_name = "products.db"
-        self.database = SqliteDatabase(self.db_name)
+        db_name = os.path.join(get_app_root(), "resources/database/products.db")
+        self.database = SqliteDatabase(db_name)
         self._initialize_database()
 
     def _initialize_database(self):

@@ -29,5 +29,5 @@ python3 src/main/py
 To build the application as a standalone executable, you can use PyInstaller.
 
 ```commandline
-pyinstaller --onefile --name "Supermarket Price Analysis" src/main.py
+pyinstaller --onefile --name "Supermarket Price Analysis" src/main.py --add-data "resources/database/products.db:resources/database"
 ```

@@ -10,15 +10,11 @@ def main():
     product_repository = ProductRepository()
     product_list = product_repository.get_all_stockcodes_by_store()
     woolworths_service = WoolworthsService()
-    stockcodes = [
-        "888140", "468984", "647107", "363945", "814479",
-        "306494", "134681", "94146", "257360"
-    ]
-    today_update: List[Product] = woolworths_service.get_product_details(stockcodes)
+    today_update: List[Product] = woolworths_service.get_product_details(product_list["woolworths"])
     for product in today_update:
         print(f"Product: {product.product_name} - {product.price}")
         product_repository.save_product(product)
-    save_products_to_csv(today_update, "output.csv")
+    save_products_to_csv(today_update, "products.csv")
 
 if __name__ == "__main__":
     main()
