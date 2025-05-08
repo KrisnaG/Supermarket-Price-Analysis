@@ -48,6 +48,14 @@ class ProductRepository:
 
         return store_stockcodes
 
+    @staticmethod
+    def get_all_products() -> List[Product]:
+        """
+        Retrieve all products from the database.
+        :returns: List of Product instances.
+        """
+        return list(Product.select())
+
     def close(self):
         """Close the database connection."""
         self.database.close()

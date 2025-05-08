@@ -1,10 +1,19 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
+from datetime import datetime
+from typing import Optional, Dict, Any, List
 import httpx
+
+from src.models.product import Product
 
 
 class ProductBaseService(ABC):
     """Abstract base class for product services."""
+
+    @property
+    @abstractmethod
+    def _store_name(self) -> str:
+        """Name of the store"""
+        pass
 
     @property
     @abstractmethod
@@ -13,11 +22,22 @@ class ProductBaseService(ABC):
         pass
 
     @abstractmethod
-    def extract_search_results(self, search_result: str) -> Optional[Dict[str, Any]]:
+    def _extract_search_results(self, search_result: str) -> Optional[Dict[str, Any]]:
         """
         Extract search results from the response.
         :param search_result: The search result string
         :returns: Dictionary containing product details or None if not found
+        """
+        pass
+
+    @abstractmethod
+    def _map_product_data(self, product_data: Dict[str, Any], stockcode: str, today: str) -> Product:
+        """
+        Map product data to the Product model.
+        :param product_data: Dictionary containing product data
+        :param stockcode: The product's ID/stockcode
+        :param today: Today's date in YYYY-MM-DD format
+        :returns: Product object
         """
         pass
 
@@ -40,8 +60,25 @@ class ProductBaseService(ABC):
             result = httpx.get(url, headers=headers, timeout=30.0)
             result.raise_for_status()
             decoded_str = result.content.decode('utf-8', errors='ignore')
-            return self.extract_search_results(decoded_str)
+            return self._extract_search_results(decoded_str)
 
         except httpx.RequestError as e:
             print(f"Error fetching product {product_id}: {str(e)}")
             return None
+
+    def get_product_details(self, stockcodes: List[str]) -> List[Product]:
+        """
+        Process products and fetch their details.
+        :param stockcodes: List of product stockcodes to process
+        :returns: List of dictionaries containing product details
+        """
+        today = datetime.now().strftime('%Y-%m-%d')
+        rows = []
+
+        for stockcode in stockcodes:
+            product_data = self.search_product(product_id=stockcode)
+            if product_data:
+                row = self._map_product_data(product_data, stockcode, today)
+                rows.append(row)
+
+        return rows
