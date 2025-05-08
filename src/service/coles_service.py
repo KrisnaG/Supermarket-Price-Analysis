@@ -16,11 +16,6 @@ class ColesService(ProductBaseService):
         return "https://www.coles.com.au/product"
 
     def _extract_search_results(self, search_result: str) -> Optional[Dict[str, Any]]:
-        """
-        Extract search results from the response.
-        :param search_result: The search result string.
-        :returns: Dictionary containing product details or None if not found.
-        """
         pass
 
     def _map_product_data(self, product_data: Dict[str, Any], stockcode: str, today: str) -> Product:

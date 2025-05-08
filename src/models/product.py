@@ -2,6 +2,7 @@ from peewee import Model, FloatField, CharField, BooleanField
 
 
 class Product(Model):
+    """Product model representing a product in the database."""
     date = CharField()
     stockcode = CharField()
     product_name = CharField()

@@ -9,3 +9,6 @@ build
 
 # Python
 __pycache__
+
+# Other
+**/*.csv

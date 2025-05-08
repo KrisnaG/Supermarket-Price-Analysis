@@ -18,11 +18,6 @@ class WoolworthsService(ProductBaseService):
         return "https://www.woolworths.com.au/shop/productdetails"
 
     def _extract_search_results(self, search_result: str) -> Optional[Dict[str, Any]]:
-        """
-        Extract search results from the response.
-        :param search_result: The search result string.
-        :returns: Dictionary containing product details or None if not found.
-        """
         match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
                           search_result, re.DOTALL)
 
