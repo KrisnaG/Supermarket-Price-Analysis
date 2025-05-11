@@ -2,7 +2,7 @@ import pandas as pd
 import tkinter as tk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, Message
 from tktooltip import ToolTip
 
 from src.repository.product_repository import ProductRepository
@@ -96,7 +96,7 @@ class ProductTrackerApp(tk.Tk):
         all_products = self.product_repository.get_all_products()
         successful, message = save_products_to_csv(all_products, "products.csv")
         if not successful:
-            messagebox.showerror("Error", message, )
+            messagebox.showerror("Error", message)
         else:
             messagebox.showinfo("Success", message)
 
@@ -188,27 +188,89 @@ class ProductTrackerApp(tk.Tk):
         add_product_frame.pack(pady=10)
         add_product_label = ttk.Label(add_product_frame, text="Add a new product")
         add_product_label.pack()
-        # Create entry fields for stockcode
-        stockcode_label = ttk.Label(add_product_frame, text="Stockcode:")
-        stockcode_label.pack()
-        stockcode_entry = ttk.Entry(add_product_frame)
-        stockcode_entry.pack()
-        stockcode_entry.focus()
-        # Create entry field for store
-        store_label = ttk.Label(add_product_frame, text="Store:")
-        store_label.pack()
-        store_entry = ttk.Entry(add_product_frame)
-        store_entry.pack()
-        store_entry.focus()
-        # Create a button to add the product
-        add_product_button = ttk.Button(add_product_frame, text="Add Product",
-                                        command=lambda: self.add_product(stockcode_entry.get(), store_entry.get()))
-        add_product_button.pack(pady=10)
 
-    def add_product(self, stockcode: str, store: str):
-        """Add a new product to the database."""
-        # TODO
-        pass
+        # Create entry fields for stockcode
+        stockcode_frame = ttk.Frame(add_product_frame)
+        stockcode_frame.pack(pady=10)
+        stockcode_label = ttk.Label(stockcode_frame, text="Stockcode:")
+        stockcode_label.pack(side="left", padx=(0, 5))
+        stockcode_entry = ttk.Entry(stockcode_frame)
+        stockcode_entry.pack(side="left")
+        stockcode_entry.focus()
+
+        # Create frame for store label and menu
+        store_frame = ttk.Frame(add_product_frame)
+        store_frame.pack(pady=10)
+        store_label = ttk.Label(store_frame, text="Store:")
+        store_label.pack(side="left", padx=(5, 10))
+
+        store_var = tk.StringVar()
+        store_var.set(list(self.product_coordinator.services.keys())[0])
+        store_menu = ttk.OptionMenu(store_frame,
+                                    store_var,
+                                    store_var.get(),
+                                    *list(self.product_coordinator.services.keys()))
+        store_menu.pack(side="left", padx=(5, 10))
+
+        # Find product button
+        find_product_button = ttk.Button(add_product_frame, text="Find Product",
+                                        command=lambda: self.find_product(stockcode_entry.get(), store_var.get(),
+                                                                          add_product_frame))
+        find_product_button.pack(pady=20)
+
+    def find_product(self, stockcode: str, store: str, store_frame: ttk.Frame) -> None:
+        """
+        Find a product.
+        :param stockcode: The product's ID/stockcode
+        :param store: The store name
+        :param store_frame: The frame to display the product details
+        """
+        if not stockcode.strip():
+            messagebox.showerror("Error", "Stockcode cannot be empty")
+            return
+        try:
+            product = self.product_coordinator.get_product_by_stockcode(stockcode=stockcode, store=store)
+
+            # Create result frame and destroy any existing one
+            for widget in store_frame.winfo_children():
+                if isinstance(widget, ttk.Frame) and widget.winfo_name() == 'result_frame':
+                    widget.destroy()
+
+            result_frame = ttk.Frame(store_frame, name='result_frame')
+            result_frame.pack(pady=20)
+
+            # Display product details
+            details = [
+                f"Name: {product.product_name}",
+                f"Price: ${product.price}",
+                f"Store: {product.store}",
+                f"Package Size: {product.package_size}",
+                f"On Special: {'Yes' if product.is_on_special else 'No'}",
+                f"Was Price: ${product.was_price if product.was_price else 'N/A'}"
+            ]
+
+            for detail in details:
+                ttk.Label(result_frame, text=detail).pack(anchor='w')
+
+            # Add save button
+            save_button = ttk.Button(
+                result_frame,
+                text="Save to Database",
+                command=lambda: self.save_product_to_db(product)
+            )
+            save_button.pack(pady=10)
+
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
+            return
+
+    def save_product_to_db(self, product) -> None:
+        """Save the product to the database."""
+        try:
+            self.product_repository.save_product(product)
+            messagebox.showinfo("Success", "Product saved to database successfully!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save product: {str(e)}")
 
     def destroy_non_main_components(self):
         """Destroy all components that are not the main components."""

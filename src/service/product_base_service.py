@@ -41,7 +41,7 @@ class ProductBaseService(ABC):
         """
         pass
 
-    def search_product(self, product_id: str) -> Optional[Dict[str, Any]]:
+    def fetch_product(self, product_id: str) -> Optional[Dict[str, Any]]:
         """
         Search for a product by its ID and return its details.
         :param product_id: The product's ID/stockcode
@@ -66,7 +66,7 @@ class ProductBaseService(ABC):
             print(f"Error fetching product {product_id}: {str(e)}")
             return None
 
-    def get_product_details(self, stockcodes: List[str]) -> List[Product]:
+    def get_products_by_stockcodes(self, stockcodes: List[str]) -> List[Product]:
         """
         Process products and fetch their details.
         :param stockcodes: List of product stockcodes to process
@@ -76,9 +76,22 @@ class ProductBaseService(ABC):
         rows = []
 
         for stockcode in stockcodes:
-            product_data = self.search_product(product_id=stockcode)
+            product_data = self.fetch_product(product_id=stockcode)
             if product_data:
                 row = self._map_product_data(product_data, stockcode, today)
                 rows.append(row)
+            else:
+                raise ValueError(f"Product with stockcode {stockcode} not found in {self._store_name}.")
 
         return rows
+
+    def get_product_by_stockcode(self, stockcode: str) -> Product:
+        """
+        Get product details by stockcode.
+        :param stockcode: The product's ID/stockcode
+        :returns: Product if found
+        """
+        product = self.get_products_by_stockcodes([stockcode])[0]
+        if product:
+            return product
+        raise ValueError(f"Product with stockcode {stockcode} not found in {self._store_name}.")

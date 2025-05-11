@@ -22,7 +22,19 @@ class ProductCoordinatorService:
 
         for store_name, service in self.services.items():
             if store_name in product_lists and product_lists[store_name]:
-                store_products = service.get_product_details(product_lists[store_name])
+                store_products = service.get_products_by_stockcodes(product_lists[store_name])
                 all_products.extend(store_products)
 
         return all_products
+
+    def get_product_by_stockcode(self, stockcode: str, store: str) -> Product:
+        """
+        Get product details by stockcode and store.
+        :param stockcode: The product's ID/stockcode
+        :param store: The store name
+        :returns: Product object or None if not found
+        """
+        if store in self.services:
+            return self.services[store].get_product_by_stockcode(stockcode)
+        else:
+            raise ValueError(f"Store '{store}' is not supported.")
