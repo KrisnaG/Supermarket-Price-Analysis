@@ -1,8 +1,9 @@
+import math
 import pandas as pd
 import tkinter as tk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from tkinter import ttk, messagebox, Message
+from tkinter import ttk, messagebox
 from tktooltip import ToolTip
 
 from src.repository.product_repository import ProductRepository
@@ -32,7 +33,7 @@ class ProductTrackerApp(tk.Tk):
         btn_frame = ttk.Frame(self)
         btn_frame.pack(pady=10)
 
-        update_product_button = ttk.Button(btn_frame, text="Update Products", command=self.update_products)
+        update_product_button = ttk.Button(btn_frame, text="Update Products", command=self.update_products_ui)
         update_product_button.pack(side="left", padx=5)
         ToolTip(update_product_button, msg="Update products from all stores", x_offset=25, y_offset=25)
 
@@ -48,11 +49,30 @@ class ProductTrackerApp(tk.Tk):
         add_product_button.pack(side="left", padx=5)
         ToolTip(add_product_button, msg="Add a new product to the Database", x_offset=25, y_offset=25)
 
-        download_csv_button = ttk.Button(btn_frame, text="Download CSV", command=self.download_all_products_to_csv)
+        download_csv_button = ttk.Button(btn_frame, text="Download CSV", command=self.show_download_csv_ui)
         download_csv_button.pack(side="left", padx=5)
         ToolTip(download_csv_button, msg="Download all products to a CSV file", x_offset=25, y_offset=25)
 
-    def update_products(self):
+    def update_products_ui(self):
+        """
+        Display UI for downloading all products to CSV with a user-provided filename.
+        """
+        self.destroy_non_main_components()
+
+        update_product_frame = ttk.Frame(self)
+        update_product_frame.pack(pady=10, fill='x')
+
+        label = ttk.Label(update_product_frame, text="Update all products in database with todays prices")
+        label.pack(padx=(10, 5))
+
+        update_button = ttk.Button(
+            update_product_frame,
+            text="Update",
+            command=lambda: self._update_products()
+        )
+        update_button.pack(side='bottom', padx=(0, 10), pady=30)
+
+    def _update_products(self):
         """Update products from all stores."""
         # Create progress bar frame and label
         progress_frame = ttk.Frame(self)
@@ -91,39 +111,162 @@ class ProductTrackerApp(tk.Tk):
             if 'progress_frame' in locals():
                 progress_frame.destroy()
 
-    def download_all_products_to_csv(self):
-        """Download all products to a CSV file."""
+    def show_download_csv_ui(self):
+        """
+        Display UI for downloading all products to CSV with a user-provided filename.
+        """
+        self.destroy_non_main_components()
+
+        download_frame = ttk.Frame(self)
+        download_frame.pack(pady=10, fill='x')
+
+        label = ttk.Label(download_frame, text="CSV Filename:")
+        label.pack(padx=(10, 5))
+
+        filename_entry = ttk.Entry(download_frame)
+        filename_entry.insert(0, "products")
+        filename_entry.pack(expand=False, padx=(0, 10), ipadx=5)
+
+        download_button = ttk.Button(
+            download_frame,
+            text="Download CSV",
+            command=lambda: self._handle_csv_download(filename_entry)
+        )
+        download_button.pack(side='bottom', padx=(0, 10), pady=30)
+
+    def _handle_csv_download(self, filename_entry):
+        """
+        Validate and trigger CSV download with custom filename.
+        """
+        filename = filename_entry.get().strip()
+
+        if not filename:
+            messagebox.showwarning("Missing Filename", "Please enter a filename.")
+            return
+
+        # Ensure the filename ends with .csv
+        if not filename.lower().endswith(".csv"):
+            filename += ".csv"
+
         all_products = self.product_repository.get_all_products()
-        successful, message = save_products_to_csv(all_products, "products.csv")
+        successful, message = save_products_to_csv(all_products, filename)
+
         if not successful:
             messagebox.showerror("Error", message)
         else:
-            messagebox.showinfo("Success", message)
+            messagebox.showinfo("Success", f"Products saved to {filename}")
 
-    def show_price_graph(self):
-        """Show a graph of product prices over time."""
+    def show_price_graph(self, transform: bool = False, selected_products: list[str] = None):
+        """Show a graph of product prices over time, with optional product filtering."""
         self.destroy_non_main_components()
 
         all_products = self.product_repository.get_all_products()
+
+        # Filter products if selection is given
+        if selected_products:
+            all_products = [p for p in all_products if p.product_name in selected_products]
+
         data = {
-            "date": [product.date for product in all_products],
-            "product_name": [product.product_name for product in all_products],
-            "price": [product.price for product in all_products],
+            "date": [p.date for p in all_products],
+            "product_name": [p.product_name for p in all_products],
+            "price": [math.log10(p.price + 1) if transform else p.price for p in all_products],
         }
+
         df = pd.DataFrame(data)
         pivot = df.pivot(index='date', columns='product_name', values='price')
 
+        # Layout
+        plot_frame = ttk.Frame(self)
+        plot_frame.pack(fill='both', pady=10, expand=True)
         fig, ax = plt.subplots(figsize=(10, 6))
         pivot.plot(ax=ax, title="Product Price History", marker='o')
         ax.set_xlabel("Date")
         ax.set_ylabel("Price")
         ax.grid(True)
         fig.autofmt_xdate()
-        plot_frame = ttk.Frame(self)
-        plot_frame.pack(fill='both', pady=10, expand=True)
 
         canvas = FigureCanvasTkAgg(fig, master=plot_frame)
         canvas.get_tk_widget().pack(fill="both", expand=True)
+
+        # Button to open filter popup
+        filter_button = ttk.Button(
+            plot_frame,
+            text="Filter Products",
+            command=lambda: self.open_filter_popup(transform, selected_products)
+        )
+        filter_button.pack(side="left", padx=20, pady=10)
+        ToolTip(filter_button, msg="Filter products on graph", x_offset=25, y_offset=25)
+
+        # Transform toggle button
+        text = "Normal Transform" if transform else "Log Transform"
+        log_transform_button = ttk.Button(
+            plot_frame,
+            text=text,
+            command=lambda: self.show_price_graph(not transform, selected_products)
+        )
+        log_transform_button.pack(side="left", padx=30, pady=10)
+        message = f"Transform data {'back to Normal pricing' if transform else 'to Log10()'}"
+        ToolTip(log_transform_button, msg=message, x_offset=25, y_offset=25)
+
+    def open_filter_popup(self, transform: bool, selected_products: list[str]):
+        """
+        Open a resizable popup window allowing the user to select which products to display on the graph.
+        :param transform: Indicates whether the current graph uses log transformation.
+        :param selected_products: A list of product names currently selected (to preselect in the popup).
+        """
+        popup = tk.Toplevel(self)
+        popup.title("Select Products")
+        popup.geometry("800x600")
+        popup.resizable(True, True)
+        popup.columnconfigure(0, weight=1)
+        popup.columnconfigure(1, weight=0)
+        popup.rowconfigure(1, weight=1)
+
+        label = ttk.Label(popup, text="Choose products to display:")
+        label.grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=(10, 0))
+
+        listbox = tk.Listbox(
+            popup, selectmode='multiple', exportselection=False
+        )
+        listbox.grid(row=1, column=0, sticky="nsew", padx=(10, 0), pady=10)
+
+        scrollbar = ttk.Scrollbar(popup, orient="vertical", command=listbox.yview)
+        scrollbar.grid(row=1, column=1, sticky='ns', pady=10, padx=(0, 10))
+        listbox.config(yscrollcommand=scrollbar.set)
+
+        # Populate listbox
+        all_product_names = sorted(set(p.product_name for p in self.product_repository.get_all_products()))
+        for name in all_product_names:
+            listbox.insert(tk.END, name)
+
+        if selected_products:
+            for i, name in enumerate(all_product_names):
+                if name in selected_products:
+                    listbox.select_set(i)
+
+        # Apply button
+        apply_button = ttk.Button(
+            popup,
+            text="Apply Filter",
+            command=lambda: self._apply_filter_and_close(
+                popup, listbox, all_product_names, transform
+            )
+        )
+        apply_button.grid(row=2, column=0, columnspan=2, pady=(0, 10))
+
+        popup.grab_set()  # Modal behavior
+
+    def _apply_filter_and_close(self, popup, listbox, all_product_names, transform):
+        """
+        Apply the selected product filters from the popup and refresh the graph.
+        :param popup: The popup window containing the product filter UI.
+        :param listbox: The listbox widget with selectable product names.
+        :param all_product_names: The complete list of product names in display order.
+        :param transform: Whether to use logarithmic transformation for the prices.
+        """
+        selected = [all_product_names[i] for i in listbox.curselection()]
+        popup.destroy()
+        self.show_price_graph(transform=transform, selected_products=selected)
 
     def show_product_table(self):
         """Show a table of all products in the database."""
@@ -214,8 +357,8 @@ class ProductTrackerApp(tk.Tk):
 
         # Find product button
         find_product_button = ttk.Button(add_product_frame, text="Find Product",
-                                        command=lambda: self.find_product(stockcode_entry.get(), store_var.get(),
-                                                                          add_product_frame))
+                                         command=lambda: self.find_product(stockcode_entry.get(), store_var.get(),
+                                                                           add_product_frame))
         find_product_button.pack(pady=20)
 
     def find_product(self, stockcode: str, store: str, store_frame: ttk.Frame) -> None:

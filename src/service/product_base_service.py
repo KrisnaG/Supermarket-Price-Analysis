@@ -8,6 +8,7 @@ from src.models.product import Product
 
 class ProductBaseService(ABC):
     """Abstract base class for product services."""
+    has_been_redirected = False
 
     @property
     @abstractmethod
@@ -41,13 +42,15 @@ class ProductBaseService(ABC):
         """
         pass
 
-    def fetch_product(self, product_id: str) -> Optional[Dict[str, Any]]:
+    def fetch_product(self, product_id: str, url: str = None) -> Optional[Dict[str, Any]]:
         """
         Search for a product by its ID and return its details.
         :param product_id: The product's ID/stockcode
+        :param url: Optional URL to fetch the product from
         :returns: Dictionary containing product details or None if not found
         """
-        url = f"{self._product_url}/{product_id}"
+        if url is None:
+            url = f"{self._product_url}/{product_id}"
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
@@ -58,7 +61,20 @@ class ProductBaseService(ABC):
 
         try:
             result = httpx.get(url, headers=headers, timeout=30.0)
-            result.raise_for_status()
+
+            # 200 - OK | 308 - Permanent Redirect
+            if result.status_code != 200 and result.status_code != 308:
+                result.raise_for_status()
+
+            # Handle the 308 Permanent Redirect
+            if result.status_code == 308 and not self.has_been_redirected:
+                self.has_been_redirected = True
+                # Handle the 308 Permanent Redirect
+                new_url = result.headers.get('Location')
+                if new_url:
+                    return self.fetch_product(product_id, new_url)
+
+            self.has_been_redirected = False
             decoded_str = result.content.decode('utf-8', errors='ignore')
             return self._extract_search_results(decoded_str)
 
