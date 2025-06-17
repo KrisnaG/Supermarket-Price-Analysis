@@ -1,4 +1,8 @@
 import math
+import re
+from typing import List
+from httpx import HTTPStatusError
+
 import pandas as pd
 import tkinter as tk
 import matplotlib.pyplot as plt
@@ -6,6 +10,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tkinter import ttk, messagebox
 from tktooltip import ToolTip
 
+from src.models.product import Product
 from src.repository.product_repository import ProductRepository
 from src.service.product_coordinator_service import ProductCoordinatorService
 from src.tools.csv_tools import save_products_to_csv
@@ -45,9 +50,14 @@ class ProductTrackerApp(tk.Tk):
         show_product_table_button.pack(side="left", padx=5)
         ToolTip(show_product_table_button, msg="Show all products in a table", x_offset=25, y_offset=25)
 
-        add_product_button = ttk.Button(btn_frame, text="Add Product", command=self.add_new_product)
-        add_product_button.pack(side="left", padx=5)
-        ToolTip(add_product_button, msg="Add a new product to the Database", x_offset=25, y_offset=25)
+        add_new_product_button = ttk.Button(btn_frame, text="Add New Product", command=self.add_new_product)
+        add_new_product_button.pack(side="left", padx=5)
+        ToolTip(add_new_product_button, msg="Add a new product to the Database", x_offset=25, y_offset=25)
+
+        add_product_entries_button = ttk.Button(btn_frame, text="Add Product Entries",
+                                                command=self.add_new_entry_to_products)
+        add_product_entries_button.pack(side="left", padx=5)
+        ToolTip(add_product_entries_button, msg="Add entries for products", x_offset=25, y_offset=25)
 
         download_csv_button = ttk.Button(btn_frame, text="Download CSV", command=self.show_download_csv_ui)
         download_csv_button.pack(side="left", padx=5)
@@ -360,6 +370,103 @@ class ProductTrackerApp(tk.Tk):
                                          command=lambda: self.find_product(stockcode_entry.get(), store_var.get(),
                                                                            add_product_frame))
         find_product_button.pack(pady=20)
+
+    def add_new_entry_to_products(self):
+        """Open a new window to add new entries to products."""
+        self.destroy_non_main_components()
+
+        add_new_entry_frame = ttk.Frame(self)
+        add_new_entry_frame.pack(pady=10, fill="both", expand=True)
+
+        add_new_entry_label = ttk.Label(add_new_entry_frame, text="Add new entries to products")
+        add_new_entry_label.pack(pady=10)
+
+        add_row_button = ttk.Button(
+            add_new_entry_frame,
+            text="Add Row",
+            command=lambda: self.add_new_product_row_to_table(table, columns)
+        )
+        add_row_button.pack(pady=10)
+
+        # Create a Treeview table
+        columns: List[str] = list(Product._meta.fields.keys())
+        columns.remove('id')
+
+        style = ttk.Style()
+        style.configure("Treeview", rowheight=40)
+        style.configure("Treeview.Heading", anchor="center")
+        table = ttk.Treeview(add_new_entry_frame, columns=columns, show="headings")
+        table.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Configure column headings and widths
+        for column in columns:
+            table.heading(column, text=column)
+            table.column(column, width=150, anchor="center")
+
+        submit_table = ttk.Button(
+            add_new_entry_frame,
+            text="Add new entries",
+            command=lambda: self.add_new_entries_to_db(table)
+        )
+        submit_table.pack(pady=10)
+
+    def add_new_product_row_to_table(self, table, columns: List[str]) -> None:
+        """
+        Open a new window to add a new row to the product table.
+        :param table: The Treeview table to add the new row to.
+        :param columns: The list of column names for the table.
+        """
+        new_row_window = tk.Toplevel(self)
+        new_row_window.title("Add New Row")
+        new_row_window.geometry("400x900")
+        new_row_frame = ttk.Frame(new_row_window)
+        new_row_frame.pack(pady=10, padx=10, fill="both", expand=True)
+        new_row_label = ttk.Label(new_row_frame, text="Enter new row data:")
+        new_row_label.pack(pady=10)
+        new_row_entries = {}
+
+        # Create entry fields for each column
+        for column in columns:
+            entry_frame = ttk.Frame(new_row_frame)
+            entry_frame.pack(fill="x", pady=5)
+            label = ttk.Label(entry_frame, text=column + ":")
+            label.pack(side="left", padx=(0, 5))
+            entry = ttk.Entry(entry_frame)
+            entry.pack(side="left", fill="x", expand=True)
+            new_row_entries[column] = entry
+
+        # Add button to add new row to table
+        def submit_new_row():
+            row_data = {current_column: new_entry.get() for current_column, new_entry in new_row_entries.items()}
+            stockcode = row_data.get('stockcode', '').strip()
+            store = row_data.get('store', '').strip()
+            date = row_data.get('date', '').strip()
+            price = row_data.get('price', '').strip()
+            try:
+                if not date or not stockcode or not store or not price:
+                    raise ValueError("Date, Stockcode, Store, and Product Name are required fields.")
+                if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+                    raise ValueError("Date must be in YYYY-MM-DD format.")
+                if not price.replace('.', '', 1).isdigit():
+                    raise ValueError("Price must be a valid number.")
+                row_data['price'] = float(price)
+                product = self.product_coordinator.get_product_by_stockcode(stockcode=stockcode, store=store)
+                row_data['product_name'] = product.product_name
+            except ValueError as e:
+                messagebox.showerror("Error", str(e))
+                return
+            except HTTPStatusError as e:
+                messagebox.showerror("Error", f"Product with stockcode '{stockcode}' not found in store '{store}'.")
+                return
+            table.insert("", "end", values=list(row_data.values()))
+            new_row_window.destroy()
+
+        submit_button = ttk.Button(new_row_frame, text="Submit", command=submit_new_row)
+        submit_button.pack(pady=10)
+
+    def add_new_entries_to_db(self, table):
+        # error message as it is not implemented yet
+        messagebox.showerror("Error", "This feature is not implemented yet. Please try again later.")
 
     def find_product(self, stockcode: str, store: str, store_frame: ttk.Frame) -> None:
         """
